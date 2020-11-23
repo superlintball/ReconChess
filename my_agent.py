@@ -23,10 +23,10 @@ class MyAgent(Player):
     def __init__(self):
         self.color = None
         self.current_board = None
-        self.num_particles = 100
+        self.num_particles = 1000
         self.particles = []
         self.old_particles = []
-        self.moves_since_reset = 0
+        self.reset_turn = True
         self.my_moves = []
         
     def handle_game_start(self, color, board):
@@ -44,6 +44,7 @@ class MyAgent(Player):
         # initialize particles to initial game state
         for i in range(self.num_particles):
             self.particles.append(board.copy())
+        self.old_particles = self.particles.copy()
         pass
         
     def handle_opponent_move_result(self, captured_piece, captured_square):
@@ -83,31 +84,42 @@ class MyAgent(Player):
                 continue
 
             moves = movescopy
-            moves.append(None) # add the possibility of no move since the agent does have this option
+            moves.append(chess.Move.null()) # add the possibility of no move since the agent does have this option
             
             # add the board and its corresponding moveset to the new set of particles
             new_particles.append(board)
             movesets.append(moves)
-    
-        # reset new particle list if necessary
-        new_particles = self._update_reset(new_particles)
 
         # repopulate all removed particles back into the list of particles
         kept_num = len(new_particles)
-        for i in range(self.num_particles - kept_num): # for every particle that was removed
-            new_particles.append(new_particles[i % kept_num].copy()) # make a copy of a kept particle
-            chosen = random.choice(movesets[i % kept_num]) # make a random move from its moveset
-            if chosen != None:
+        if (kept_num > 0):
+            for i in range(self.num_particles - kept_num): # for every particle that was removed
+                new_particles.append(new_particles[i % kept_num].copy()) # make a copy of a kept particle
+                chosen = random.choice(movesets[i % kept_num]) # make a random move from its moveset
+                counter = 0
+                pseudo_legal = list(new_particles[-1].generate_pseudo_legal_moves())
+                while (chosen not in pseudo_legal and counter < 50):
+                    chosen = random.choice(movesets[i % kept_num])
+                    counter += 1
+                if counter >= 50:
+                    new_particles[-1].push(chess.Move.null())
+                    continue
                 new_particles[-1].push(chosen)
-            else:
-                new_particles[-1].push(chess.Move.null())
-        
-        for i in range(kept_num): # for every particle that was kept
-            chosen = random.choice(movesets[i]) # make a random move from its moveset
-            if chosen != None:
+            
+            for i in range(kept_num): # for every particle that was kept
+                chosen = random.choice(movesets[i]) # make a random move from its moveset
+                counter = 0
+                pseudo_legal = list(new_particles[i].generate_pseudo_legal_moves())
+                while (chosen not in pseudo_legal and counter < 50):
+                    chosen = random.choice(movesets[i])
+                    counter += 1
+                if counter >= 50:
+                    new_particles[i].push(chess.Move.null())
+                    continue
                 new_particles[i].push(chosen)
-            else:
-                new_particles[i].push(chess.Move.null())
+    
+        # reset new particle list if necessary
+        new_particles = self._update_reset(new_particles, self.color)
         
         random.shuffle(new_particles) # randomize it to remove any sort of bias towards a specific board position
         self.particles = new_particles # update particles with the opponent move info
@@ -165,7 +177,7 @@ class MyAgent(Player):
                 new_particles.append(board)
         
         # reset new particle list if necessary
-        new_particles = self._update_reset(new_particles)
+        new_particles = self._update_reset(new_particles, self.color)
 
         # repopulate removed particles back into the list of particles
         kept_num = len(new_particles)
@@ -234,10 +246,10 @@ class MyAgent(Player):
             board.push(taken_move)
             new_particles.append(board)
         
-        # reset new particle list if necessary
-        new_particles = self._update_reset(new_particles)
         # store the move that was taken for reset purposes
         self.my_moves.append(taken_move)
+        # reset new particle list if necessary
+        new_particles = self._update_reset(new_particles, not self.color)
 
         #repopulate pruned particles back into the main list
         kept_num = len(new_particles)
@@ -263,13 +275,14 @@ class MyAgent(Player):
         print(win_reason)
         pass
 
-    def _update_reset(self, new_particles):
+    def _update_reset(self, new_particles, next_turn):   
         """
         This function checks if every single particle is objectively incorrect, and resets
         them if they are. Additionally, it keeps track of what the particles should be
         reset to.
 
         :param new_particles: a pruned list of particles that might be empty
+        :param next_turn: what the next turn is (so that reset simulates the correct number of extra moves)
         :returns new_particles: a pruned list of particles that is definitely not empty
         """
         kept_num = len(new_particles) # check the length of the pruned list
@@ -280,33 +293,54 @@ class MyAgent(Player):
                 self.old_particles.append(self.old_particles[i % kept_num])
             random.shuffle(self.old_particles)
             # re-initialize the reset variables since we have a new basis
-            self.moves_since_reset = 0
+            self.reset_turn = next_turn
             self.my_moves = []
-        elif kept_num == 0: # if all particles are garbage, reset them
-            new_particles = self.old_particles # set the particles to the last valid set
-            # the last valid set is out of date, so we need to simulate every missed timestep
-            for i in range(self.moves_since_reset): # for each time step
-                for i in range (len(new_particles)): # for each particle
-                    board = new_particles[i]
+        elif kept_num == 0: # if all particles are garbage, reset the
+            new_particles = self.old_particles.copy() # set the particles to the last valid set
+
+            # the last valid set of particles is out of date, so we need to simulate missed moves
+            # if the next turn on the last stored reset was mine, make the first move in the my_moves array
+            # if self.reset_turn == self.color and len(self.my_moves) > 0:
+            #     for j in range(len(new_particles)):
+            #         board = new_particles[j]
+            #         board.turn = self.color
+            #         if self.my_moves[0] not in list(board.generate_pseudo_legal_moves()):
+            #             new_particles[j] = new_particles[j-1].copy()
+            #             continue
+            #         board.push(self.my_moves[0])
+            #     del self.my_moves[0]
+
+            # alternate opponent simulation and my moves until all of my stored moves have been applied
+            for i in range(len(self.my_moves)): # for each time step
+                for j in range (len(new_particles)): # for each particle
+                    board = new_particles[j]
                     # randomly make a move for the opponent
                     board.turn = not self.color
                     moves = list(board.generate_pseudo_legal_moves())
+                    moves.append(chess.Move.null())
                     temp = board.copy()
                     board.push(random.choice(moves))
                     counter = 0
-                    while (self.my_moves[i] not in board.generate_pseudo_legal_moves() and counter < 50):
+                    while (self.my_moves[i] not in list(board.generate_pseudo_legal_moves()) and counter < 50):
                         board = temp.copy()
                         board.push(random.choice(moves))
                         counter += 1
                     if counter >= 50:
-                        new_particles[i] = new_particles[i-1].copy()
+                        new_particles[j] = new_particles[j-1].copy()
                         continue
                     # we know exactly what the player's move was, so do that
                     board.push(self.my_moves[i])
-                    new_particles[i] = board
-            self.moves_since_reset += 1 # increment number of moves since last reset
-        else:
-            self.moves_since_reset += 1 # increment number of moves since last reset
+                    new_particles[j] = board
+            
+            # if the next turn is my move, I need to simulate one extra opponent move
+            # if next_turn == self.color:
+            #     for j in range(len(new_particles)):
+            #         board = new_particles[j]
+            #         board.turn = not self.color
+            #         moves = list(board.generate_pseudo_legal_moves())
+            #         moves.append(chess.Move.null())
+            #         board.push(random.choice(moves))
+            #         new_particles[j] = board
         
         # return new_particles. Note: new_particles only changed if len was 0, otherwise it stayed constant
         return new_particles
