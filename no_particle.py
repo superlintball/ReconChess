@@ -156,7 +156,7 @@ class MyAgent(Player):
         # now that we've guaranteed every square in the sense results either has the right piece or no piece, iterate through the results again
         for square, piece in sense_result:
             # if there's a piece here, it's most likely the right one
-            if self.current_board.piece_at(square) != None:
+            if self.current_board.piece_at(square) != None or piece == None:
                 continue
             # look for any valid move that will place the right piece in this spot
             self.current_board.turn = not self.color
