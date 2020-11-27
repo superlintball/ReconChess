@@ -21,6 +21,7 @@ import chess
 class MyAgent(Player):
 
     def __init__(self):
+
         self.color = None
         self.current_board = None
         self.num_particles = 1000
@@ -138,11 +139,7 @@ class MyAgent(Player):
         :return: chess.SQUARE -- the center of 3x3 section of the board you want to sense
         :example: choice = chess.A1
         """
-
-        #TODO: Honestly not sure we might need some sort of policy to decide where to sense, or we can go random
-
-        print('\--------------Choose Sense--------------/')
-        moves = list(self.current_board.pseudo_legal_moves)
+        moves = list(self.current_board.legal_moves)
         our_pieces = []
         for move in moves:
             pos = str(move)[0:2]
@@ -171,40 +168,17 @@ class MyAgent(Player):
 
         smart_sence = [i for i in smart_sence if i not in sides]
 
-        if seconds_left >= 400:     #6.6 or more minutes left in the game
-            middle_area = smart_sence[12:-12]
-            sides = []
-            for sence in middle_area:
-                if sence % 8 == 1:
-                    sides.append(sence)
-                if sence % 8 == 6:
-                    sides.append(sence)
-            middle_area = [i for i in middle_area if i not in sides]
+        avoid = []
+        for spot in smart_sence:
+            if spot in piece_sence:
+                avoid.append(spot)
 
-            avoid = []
-            for mid in middle_area:
-                if mid in piece_sence:
-                    avoid.append(mid)
+        if avoid:
+            avg = sum(avoid)/len(avoid)
+            sence = smart_sence[min(range(len(smart_sence)), key = lambda i: abs(smart_sence[i]-avg))]
+        else:
+            sence = random.choice(smart_sence)
 
-            if avoid:
-                avg = sum(avoid)/len(avoid)
-                sence = middle_area[min(range(len(middle_area)), key = lambda i: abs(middle_area[i]-avg))]
-            else:
-                sence = random.choice(middle_area)
-        else:  #less than 6.6 minutes left in the game
-
-            avoid = []
-            for spot in smart_sence:
-                if spot in piece_sence:
-                    avoid.append(spot)
-
-            if avoid:
-                avg = sum(avoid)/len(avoid)
-                sence = smart_sence[min(range(len(smart_sence)), key = lambda i: abs(smart_sence[i]-avg))]
-            else:
-                sence = random.choice(smart_sence)
-
-        
         return sence
 
         
@@ -336,6 +310,7 @@ class MyAgent(Player):
         :param winner_color: Chess.BLACK/chess.WHITE -- the winning color
         :param win_reason: String -- the reason for the game ending
         """
+
         # TODO: implement this method
         print('\--------------Game End--------------/')
         print(winner_color)

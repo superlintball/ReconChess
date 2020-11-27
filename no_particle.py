@@ -82,7 +82,6 @@ class MyAgent(Player):
         #TODO: Honestly not sure we might need some sort of policy to decide where to sense, or we can go random
 
         print('\--------------Choose Sense--------------/')
-        sense_square = [0,0]
         if self.sense_request > -1: # if a square is requested to sense, please sense it
             sense_square = [chess.square_file(self.sense_request), chess.square_rank(self.sense_request)]
             # take the time to make sure you're not sensing an edge
@@ -90,15 +89,62 @@ class MyAgent(Player):
             sense_square[1] = max(sense_square[1], 1)
             sense_square[0] = min(sense_square[0], 7)
             sense_square[1] = min(sense_square[1], 7)
-        else: # if there is no specific square to sense, sense wherever (other than edges)
-            while (sense_square[0] == 0 or sense_square[0] == 7 or sense_square[1] == 0 or sense_square[1] == 7):
-                temp = random.choice(possible_sense)
-                sense_square = [chess.square_file(temp), chess.square_rank(temp)]
+            
+            # reset sense request to -1 and return the square to be sensed
+            self.sense_request = -1
+            return chess.square(sense_square[0], sense_square[1])
+            
+        # else: # if there is no specific square to sense, sense wherever (other than edges)
+        #     while (sense_square[0] == 0 or sense_square[0] == 7 or sense_square[1] == 0 or sense_square[1] == 7):
+        #         temp = random.choice(possible_sense)
+        #         sense_square = [chess.square_file(temp), chess.square_rank(temp)]
         
-        # reset sense request to -1 and return the square to be sensed
-        self.sense_request = -1
-        return chess.square(sense_square[0], sense_square[1])
+        # # reset sense request to -1 and return the square to be sensed
+        # self.sense_request = -1
+        # return chess.square(sense_square[0], sense_square[1])
         
+        moves = list(self.current_board.pseudo_legal_moves)
+        our_pieces = []
+        for move in moves:
+            pos = str(move)[0:2]
+            if pos not in our_pieces:
+                our_pieces.append(pos)
+
+        columns = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+        piece_sence = []
+        for piece in our_pieces:
+            row = int(piece[1])
+            col = 0
+            for i in range(len(columns)):
+                if piece[0] == columns[i]:
+                    col = i
+            index = (row-1)*8+col
+            piece_sence.append(index)
+        #need to remove edges of board for sense 
+        smart_sence = possible_sense[8:-8]
+        sides = []
+        for sence in smart_sence:
+            if sence % 8 == 0:
+                sides.append(sence)
+            if sence % 8 == 7:
+                sides.append(sence)
+
+        smart_sence = [i for i in smart_sence if i not in sides]
+        avoid = []
+        for spot in smart_sence:
+            if spot in piece_sence:
+                avoid.append(spot)
+        print("avoid: ")
+        print(avoid)
+        if avoid:
+            avg = sum(avoid)/len(avoid)
+            sence = smart_sence[min(range(len(smart_sence)), key = lambda i: abs(smart_sence[i]-avg))]
+        else:
+            sence = random.choice(smart_sence)
+        
+        return sence
+
+
     def handle_sense_result(self, sense_result):
         """
         This is a function called after your picked your 3x3 square to sense and gives you the chance to update your
@@ -227,6 +273,8 @@ class MyAgent(Player):
         :param captured_square: chess.Square - position where you captured the piece
         """
         print('\--------------Handle Move--------------/')
+        print(self.current_board)
+        print("Taken move: " + str(taken_move))
         if taken_move != None: # if a move was actually taken
             # if it was a valid move in our board model, do it
             self.current_board.turn = self.color
@@ -267,6 +315,7 @@ class MyAgent(Player):
                     self.current_board.set_piece_at(rand_square, self.current_board.remove_piece_at(taken_move.to_square))
                 # now that there is no piece at the destination square, force the taken move to occur
                 self.current_board.set_piece_at(taken_move.to_square, self.current_board.remove_piece_at(taken_move.from_square))
+        print(self.current_board)
 
         
     def handle_game_end(self, winner_color, win_reason):  # possible GameHistory object...
