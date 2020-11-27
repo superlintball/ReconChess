@@ -12,7 +12,7 @@ class MCTS:
         self.limit = time_limit
         self.team = player
         self.tree = None
-        self.moves = list(board.pseudo_legal_moves)
+        self.moves = list(board.legal_moves)
 
     def search(self):
         start_time = time.time()
@@ -58,7 +58,7 @@ class MCTS:
         moves.remove(move)
         node['actions'] = moves
         board_copy.push(move)
-        return {'parent': node, 'actions': list(board_copy.pseudo_legal_moves), 'move': move, 'state': board_copy, 'turn': node['turn'] * -1, 'num_wins': 0, 'num_sims': 0, 'children': []}
+        return {'parent': node, 'actions': list(board_copy.legal_moves), 'move': move, 'state': board_copy, 'turn': node['turn'] * -1, 'num_wins': 0, 'num_sims': 0, 'children': []}
 
     def sel(self, root):
         if len(root['children']) == 0:
@@ -86,18 +86,28 @@ class MCTS:
         curr_state = board
         while 1:
             board_copy = copy(curr_state)
-            if board_copy.fen().split()[0].lower().count('k') < 2:
-                winner = chess.WHITE if board_copy.fen().split()[0].count('k') == 0 else chess.BLACK
-                if winner == chess.WHITE:
+                
+            # board_copy = copy(curr_state)
+            # if board_copy.fen().split()[0].lower().count('k') < 2:
+            #     winner = chess.WHITE if board_copy.fen().split()[0].count('k') == 0 else chess.BLACK
+            #     if winner == team:
+            #         return 1
+            #     else:
+            #         return 0
+            if board_copy.is_game_over(claim_draw=True):
+                if board_copy.is_checkmate():
+                    turn = board_copy.fen().split()[1]
                     if team:
-                        return 1
+                        if turn == 'w':
+                            return 0
+                        else:
+                            return 1
                     else:
-                        return 0
-                else:
-                    if team:
-                        return 0
-                    else:
-                        return 1
+                        if turn == 'w':
+                            return 1
+                        else:
+                            return 0
+                return .5
             else:
                 possible_moves = list(board_copy.pseudo_legal_moves)
                 possible_moves.append(chess.Move.null())
@@ -128,4 +138,3 @@ class MCTS:
         node5['children'].append(node9)
         node5['children'].append(node0)
         return root
-
