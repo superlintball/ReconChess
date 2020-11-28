@@ -85,15 +85,11 @@ class MCTS:
     def sim(self, board, team):
         curr_state = board
         while 1:
-            board_copy = copy(curr_state)
-                
             # board_copy = copy(curr_state)
             # if board_copy.fen().split()[0].lower().count('k') < 2:
             #     winner = chess.WHITE if board_copy.fen().split()[0].count('k') == 0 else chess.BLACK
-            #     if winner == team:
-            #         return 1
-            #     else:
-            #         return 0
+            #     return int(winner == team)
+            board_copy = copy(curr_state)
             if board_copy.is_game_over(claim_draw=True):
                 if board_copy.is_checkmate():
                     turn = board_copy.fen().split()[1]
