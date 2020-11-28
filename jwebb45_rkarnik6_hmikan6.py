@@ -13,7 +13,7 @@ Source:         Adapted from recon-chess (https://pypi.org/project/reconchess/)
 
 import random
 from player import Player
-from mcts import MCTS
+from jwebb45_rkarnik6_hmikan6_mcts import MCTS
 import chess
 
 
@@ -25,6 +25,7 @@ class MyAgent(Player):
         self.color = None
         self.current_board = None
         self.sense_request = -1
+        self.start_moves = [chess.Move(chess.E1,chess.G1),chess.Move(chess.F1,chess.C4),chess.Move(chess.G1,chess.F3),chess.Move(chess.E2,chess.E4)]
 
     def handle_game_start(self, color, board):
         """
@@ -39,6 +40,10 @@ class MyAgent(Player):
 
         self.color = color # set player color
         self.current_board = board # set the assumed board state
+        if self.color == chess.WHITE:
+            self.start_moves = [chess.Move(chess.E1,chess.G1),chess.Move(chess.F1,chess.C4),chess.Move(chess.G1,chess.F3),chess.Move(chess.E2,chess.E4)]
+        else:
+            self.start_moves = [chess.Move(chess.E8,chess.G8),chess.Move(chess.F8,chess.C5),chess.Move(chess.G8,chess.F6),chess.Move(chess.E7,chess.E5)]
         pass
 
     def handle_opponent_move_result(self, captured_piece, captured_square):
@@ -236,8 +241,8 @@ class MyAgent(Player):
         """
         # TODO: update this method
         print('\--------------Choose Move--------------/')
-        #print(possible_moves)
-        #print(list(self.current_board.pseudo_legal_moves))
+        if len(self.start_moves) > 0:
+            return self.start_moves.pop()
         search_tree = MCTS(5, self.color, self.current_board)
         search_tree.search()
         move = search_tree.pick_move()['move']
